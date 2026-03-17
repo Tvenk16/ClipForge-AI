@@ -20,17 +20,18 @@ def run_pipeline(job_id: str, youtube_url: str) -> None:
     caption_agent = CaptionAgent()
 
     try:
-        # Scout: transcript + metadata
+        # Scout: transcript + metadata + raw segments
         scout_result = scout.run(youtube_url)
         transcript = scout_result.get("transcript", "") or ""
+        segments = scout_result.get("segments") or []
         redis_svc.update_job(job_id, transcript=transcript)
 
-        # Clip: timestamps
-        clips = clip_agent.run(transcript)
+        # Clip: timestamps (derived from transcript; consult LLM when configured)
+        clips = clip_agent.run(transcript, segments=segments)
         redis_svc.update_job(job_id, clips=clips)
 
-        # Caption: hook, caption, hashtags per clip
-        captions = caption_agent.run_for_clips(transcript, clips)
+        # Caption: hook, caption, hashtags per clip, based on actual transcript segments
+        captions = caption_agent.run_for_clips(transcript, clips, segments=segments)
         redis_svc.update_job(job_id, captions=captions, status=JobStatus.COMPLETED)
     except Exception as e:
         redis_svc.update_job(

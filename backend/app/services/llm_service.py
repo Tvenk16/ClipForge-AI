@@ -27,40 +27,82 @@ class LLMService:
             return bool(self._claude_key)
         return False
 
-    def generate_clip_ideas(self, transcript: str) -> list[dict]:
+    def generate_clip_ideas(self, transcript: str, total_seconds: float | None = None) -> list[dict]:
         """
         Generate clip ideas from transcript (timestamps + rationale).
-        Returns list of { start_seconds, end_seconds, reason }.
+        Returns list of
+        { start_seconds, end_seconds, title, reason }.
         TODO: Real API - send transcript to LLM, parse structured output.
         """
         if not self._has_api_key():
-            # Placeholder: return mock clip ideas
-            return [
-                {"start_seconds": 0.0, "end_seconds": 30.0, "reason": "Hook / intro"},
-                {"start_seconds": 45.0, "end_seconds": 75.0, "reason": "Tip 1-2"},
-                {"start_seconds": 120.0, "end_seconds": 150.0, "reason": "Tip 4-5"},
-            ]
-        # TODO: Production - call OpenAI/Claude with prompt to extract viral clips
+            # Heuristic fallback when no LLM credentials are configured.
+            # Split the transcript into up to 3 evenly-spaced windows across the
+            # approximate duration (if known), or default to 3x30s chunks.
+            if not transcript:
+                return []
+            approx_duration = float(total_seconds or 90.0)
+            window = approx_duration / 3.0
+            ideas: list[dict] = []
+            for i in range(3):
+                start = window * i
+                end = min(start + window, approx_duration)
+                ideas.append(
+                    {
+                        "start_seconds": round(start, 2),
+                        "end_seconds": round(end, 2),
+                        "title": f"Clip {i + 1}",
+                        "reason": "Heuristic segment based on transcript length.",
+                    }
+                )
+            return ideas
+
+        # TODO: Production - call OpenAI/Claude with a structured prompt such as:
+        #  - System: "You are an editor selecting short-form video clips."
+        #  - User: "Given this transcript, return 3 high-impact short clips..."
+        # The LLM should respond with JSON that we parse into the shape below.
+        #
+        # For now we still return a simple static structure, but callers treat it
+        # as LLM output.
         return [
-            {"start_seconds": 0.0, "end_seconds": 30.0, "reason": "Hook"},
-            {"start_seconds": 45.0, "end_seconds": 75.0, "reason": "Key insight"},
+            {
+                "start_seconds": 0.0,
+                "end_seconds": 30.0,
+                "title": "Hook",
+                "reason": "High-energy opening hook.",
+            },
+            {
+                "start_seconds": 45.0,
+                "end_seconds": 75.0,
+                "title": "Key Insight",
+                "reason": "Most compelling teaching moment.",
+            },
+            {
+                "start_seconds": 90.0,
+                "end_seconds": 120.0,
+                "title": "Call to Action",
+                "reason": "Strong CTA and takeaway.",
+            },
         ]
 
-    def generate_caption(self, text: str) -> dict:
+    def generate_caption(self, text: str, *, title: str | None = None) -> dict:
         """
         Generate hook, caption, and hashtags for a clip.
         Returns { hook, caption, hashtags }.
         TODO: Real API - call LLM with clip context.
         """
         if not self._has_api_key():
+            base_caption = text[:200] + ("..." if len(text) > 200 else "")
             return {
-                "hook": "You won't believe this.",
-                "caption": text[:200] + ("..." if len(text) > 200 else ""),
-                "hashtags": ["#shorts", "#viral", "#tips", "#productivity"],
+                "hook": title or "You won't believe this.",
+                "caption": base_caption,
+                "hashtags": ["#shorts", "#viral", "#clipforge", "#content"],
             }
-        # TODO: Production - call OpenAI/Claude for caption generation
+        # TODO: Production - call OpenAI/Claude for caption generation with a prompt
+        # that includes the segment text and optional title, asking for a hook,
+        # caption, and hashtag set tailored for short-form content.
+        base_caption = text[:200] + ("..." if len(text) > 200 else "")
         return {
-            "hook": "Save this for later.",
-            "caption": text[:200] + ("..." if len(text) > 200 else ""),
+            "hook": title or "Save this for later.",
+            "caption": base_caption,
             "hashtags": ["#shorts", "#viral", "#productivity"],
         }
