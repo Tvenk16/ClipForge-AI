@@ -27,7 +27,7 @@ class LLMService:
             return bool(self._claude_key)
         return False
 
-    def generate_clip_ideas(self, transcript: str, total_seconds: float | None = None) -> list[dict]:
+    def generate_clip_ideas(self, transcript: str, total_seconds: Optional[float] = None) -> list[dict]:
         """
         Generate clip ideas from transcript (timestamps + rationale).
         Returns list of
@@ -84,7 +84,7 @@ class LLMService:
             },
         ]
 
-    def generate_caption(self, text: str, *, title: str | None = None) -> dict:
+    def generate_caption(self, text: str, *, title: Optional[str] = None) -> dict:
         """
         Generate hook, caption, and hashtags for a clip.
         Returns { hook, caption, hashtags }.

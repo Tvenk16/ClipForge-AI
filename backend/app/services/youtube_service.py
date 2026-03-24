@@ -23,6 +23,7 @@ class YouTubeService:
 
         Supports:
         - https://www.youtube.com/watch?v=VIDEO_ID
+        - https://www.youtube.com/shorts/VIDEO_ID
         - https://youtu.be/VIDEO_ID
         - https://www.youtube.com/embed/VIDEO_ID
         """
@@ -45,6 +46,10 @@ class YouTubeService:
         # Embed URL: https://www.youtube.com/embed/VIDEO_ID
         if parsed.path.startswith("/embed/"):
             return parsed.path.split("/embed/")[1].split("/")[0]
+
+        # Shorts URL: https://www.youtube.com/shorts/VIDEO_ID
+        if parsed.path.startswith("/shorts/"):
+            return parsed.path.split("/shorts/")[1].split("/")[0]
 
         return None
 

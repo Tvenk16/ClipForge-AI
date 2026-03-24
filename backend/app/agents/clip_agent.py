@@ -27,6 +27,36 @@ class ClipAgent:
         last = segments[-1]
         return float(last.get("start", 0.0)) + float(last.get("duration", 0.0))
 
+    def _heuristic_ideas_from_segments(self, segments: List[Dict]) -> list[dict]:
+        """
+        Transcript-based fallback clip ideas when no LLM output is available.
+        Picks segments with the richest text payload and builds 20-50s windows.
+        """
+        if not segments:
+            return []
+        ranked = sorted(
+            segments,
+            key=lambda s: len((s.get("text") or "").strip()),
+            reverse=True,
+        )
+        ideas: list[dict] = []
+        for idx, seg in enumerate(ranked[:3]):
+            start = max(0.0, float(seg.get("start", 0.0)) - 5.0)
+            duration = float(seg.get("duration", 0.0))
+            end = start + max(20.0, min(50.0, duration + 20.0))
+            text = (seg.get("text") or "").strip()
+            title = (text[:42] + "...") if len(text) > 45 else (text or f"Clip {idx + 1}")
+            ideas.append(
+                {
+                    "start_seconds": round(start, 2),
+                    "end_seconds": round(end, 2),
+                    "title": title,
+                    "reason": "High-information transcript segment selected heuristically.",
+                }
+            )
+        ideas.sort(key=lambda x: x["start_seconds"])
+        return ideas
+
     def run(self, transcript: str, *, segments: Optional[List[Dict]] = None) -> list[dict]:
         """
         Return list of clip definitions:
@@ -41,6 +71,8 @@ class ClipAgent:
 
         total_seconds = self._infer_duration_from_segments(segments or [])
         ideas = self._llm.generate_clip_ideas(transcript, total_seconds=total_seconds)
+        if not ideas:
+            ideas = self._heuristic_ideas_from_segments(segments or [])
 
         clips: list[dict] = []
         for idea in ideas:
